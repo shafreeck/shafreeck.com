@@ -23,4 +23,12 @@ build:
     - arjen/hugo-build@1.9.2       
       theme: "beg"
       flags: --buildDrafts=true
+  steps:
+    - lukevivier/gh-pages@0.2.1
 
+deploy:
+  steps:
+    - gh-pages:
+        token: 36d3df71f9ad610436d3089590daf260e1b722d9
+        domain: shafreeck.com
+        basedir: public
