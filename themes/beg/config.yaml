@@ -3,14 +3,12 @@ LanguageCode: "en-us"
 Title: "Beg"
 
 Params:
-  Author: "Your name."
+  Author: "Shafreeck Sea"
   DateForm: "Mon, Jan 2, 2006"
   GoogleAnalyticsUserID: "Your ID."
-  Facebook: "Your ID."
-  Twitter: "Your ID."
-  Github: "Your ID."
+  Github: "shafreeck"
   ShowRelatedPost: True
-  Disqus: "Your Disqus."
+  Disqus: "shafreeck"
   SyntaxHighlightTheme: "solarized_dark.min.css"
 
 Indexes:
