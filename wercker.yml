@@ -20,15 +20,15 @@ build:
     # Read more about steps on our dev center:
     # http://devcenter.wercker.com/docs/steps/index.html
   steps:
-    - arjen/hugo-build@1.9.2       
+    - arjen/hugo-build@1.9.2:       
       theme: "beg"
       flags: --buildDrafts=true
-  steps:
-    - lukevivier/gh-pages@0.2.1
 
 deploy:
   steps:
-    - gh-pages:
+    - install-packages:
+        packages: git ssh-client
+    - lukevivier/gh-pages@0.2.1:
         token: 36d3df71f9ad610436d3089590daf260e1b722d9
         domain: shafreeck.com
         basedir: public
