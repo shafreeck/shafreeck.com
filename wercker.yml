@@ -29,6 +29,6 @@ deploy:
     - install-packages:
         packages: git ssh-client
     - lukevivier/gh-pages@0.2.1:
-        token: 36d3df71f9ad610436d3089590daf260e1b722d9
+        token: $GIT_TOKEN 
         domain: shafreeck.com
         basedir: public
