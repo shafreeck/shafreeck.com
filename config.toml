@@ -1,4 +1,10 @@
 baseurl = "http://shafreeck.com/"
 languageCode = "en-us"
 title = "Shafreeck Sea"
-theme = "beg"
+theme = "angels-ladder"
+disqusShortname = "shafreeck"
+
+[Params]
+github = "https://github.com/shafreeck"
+showsRSS = true
+copyright = "Written by Shafreeck Sea"
