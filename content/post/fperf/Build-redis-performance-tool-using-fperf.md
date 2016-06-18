@@ -95,13 +95,13 @@ func init() {
 
 ### Build your testcase using "buildtestcase.sh"
 
-```shell
+```bash
 ./buildtestcase.sh testcases/redis/
 ```
 
 ### Run the benchmark
 
-```shell
+```bash
 ./fperf -server redis://localhost:6379 redis hset key field value
 2016/04/17 00:04:35 latency 51.447µs qps 18671 total 37343
 2016/04/17 00:04:37 latency 33.881µs qps 27777 total 92898
