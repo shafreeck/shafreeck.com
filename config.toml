@@ -5,6 +5,7 @@ theme = "angels-ladder"
 disqusShortname = "shafreeck"
 
 [Params]
+subtitle = "Share, Free, and Hack! So you got shafreeck."
 github = "https://github.com/shafreeck"
 showsRSS = true
 copyright = "Written by Shafreeck Sea"
