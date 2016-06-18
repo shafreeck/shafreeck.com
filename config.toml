@@ -5,7 +5,10 @@ theme = "angels-ladder"
 disqusShortname = "shafreeck"
 
 [Params]
-subtitle = "Share, Free, and Hack! So you got shafreeck."
+subtitle = "Share Free and Hack, Then you got shafreeck!"
 github = "https://github.com/shafreeck"
+twitter = "https://twitter.com/shafreeck"
+analytics = "UA-79546556-1"
+shareThis = "6b8032c5-8647-462a-8e27-c63e9b718c8a"
 showsRSS = true
 copyright = "Written by Shafreeck Sea"

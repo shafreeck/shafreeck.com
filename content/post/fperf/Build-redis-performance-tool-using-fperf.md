@@ -2,7 +2,7 @@
 author = "Shafreeck Sea"
 date = "2016-06-18T23:15:30+08:00"
 title = "Build redis performance tool using fperf"
-
+tags = ["golang", "performance", "fperf"]
 +++
 
 # Build redis performance tool using fperf

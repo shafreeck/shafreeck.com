@@ -2,7 +2,7 @@
 author = "Shafreeck Sea"
 date = "2016-06-18T17:35:36+08:00"
 title = "Use go struct tags to correctly handle configuration"
-
+tags = ["golang", "configo", "toml"]
 +++
 
 [configo](https://github.com/shafreeck/configo) is a `toml` parsing library focus on configuration. This article describes what I need to parse a configuration file, why I created configo and how to use it to keep consistent between your code and your configuration file. It is a young project and under active development, feel free to feedback or send me pull request if there is anything you want to improve.
