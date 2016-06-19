@@ -1,37 +1,37 @@
 +++
 author = "Shafreeck Sea"
 date = "2016-06-18T17:35:36+08:00"
-title = "Use go struct tags to correctly handle configuration"
+title = "Go struct tags is a simple and powerful way to handle configuration"
 tags = ["golang", "configo", "toml"]
 +++
 
-[configo](https://github.com/shafreeck/configo) is a `toml` parsing library focus on configuration. This article describes what I need to parse a configuration file, why I created configo and how to use it to keep consistent between your code and your configuration file. It is a young project and under active development, feel free to feedback or send me pull request if there is anything you want to improve.
+[configo](https://github.com/shafreeck/configo) is a `toml` parsing library focus on configuration. This article describes what I need to parse a configuration file, why I created configo and how to use it to keep consistent between your code and your configuration file. It is a young project and under active development, feel free to feedback or send me pull requests if there is anything you want to improve.
 
-## What I want to correctly handle a configuration file
+## What I need to handle a configuration file
 
 I have started several projects these days. They all need configuration files to configure its server options.
 
-I looked several configuration file format including `json`, `ini`, `yaml`, and `toml`. Finally I decide to use `toml` which is designed specifically for configuration file and supplies many features including supporting multiple sections(tables), adding comment inside an array and so on. See the [docs](https://github.com/toml-lang/toml#comparison-with-other-formats) for information about comparing toml with others.
+I looked several configuration file format including `json`, `ini`, `yaml`, and `toml`. Finally I decide to use `toml` which aims to be a minimal configuration file format that's easy to read due to obvious semantics. See the [docs](https://github.com/toml-lang/toml#comparison-with-other-formats) for details about comparing toml with others.
 
-All my projects are written in golang. So I need a library to load the toml configuration file. There are several awesome projects can do this, but they all miss something I really want.
+All my projects are written in go. So I need a go library to load the `toml` file. There are several awesome projects can do this, but they all miss something I really want.
 
 ## 1. Loading `TOML` in a gopher way
 
-JSON(encoding/json) is a good example to explain what I mean "in a gopher way" here. Go has a very simple api to parse a `json` file.
+JSON(encoding/json) is a good example to explain what I mean "in a gopher way" here. Go has a very simple api to parse ajson` data.
 
 ```go
 json.Unmarshal(data []byte, v interface{}) error
 ```
 
-You define a go struct according to the `json` and json.Unmarshal it then the struct object's fields will be filled using the values in `json`.
+You define a go struct according to the `json` and json.Unmarshal it then the struct object's fields will be filled using the values in `json` data.
 
-What I really want is a `toml.Unmarshal` method to `toml`. In fact many projects already support this, but they all miss some semantics to handle configuration.
+What I really want is a `toml.Unmarshal` method to `toml`. In fact many projects already support this, but they all miss some semantics of configuration.
 
 ## 2. Configuration semantics
 
-The standard library `encoding/json` is designed to serialize and deserialize json data. However, configuration is different in many aspects. First, configuration is usually used in almost all services which power your company(maybe facebook, twitter or something else). An error in configuration file may cause a disaster to your service. Second, configuration files are usually created and managed by operators or developers, mistakes by humans can be nearly unavoidable. Third, not all configuration options have to be configured, some is required and some can be optional with a default value.
+The standard library `encoding/json` is designed to serialize and deserialize json data. However, configuration is different in many aspects. First, configuration is usually used in almost all services which power your company(maybe facebook, twitter or something else). An error in configuration may cause a disaster. Second, configuration files are usually created and managed by operators or developers, mistakes by humans can be nearly unavoidable. Third, not all configuration options have to be configured, some is required and some can be optional with a default value.
 
-So the core features I need should be supplied is as below:
+So the core features that should be supplied are as below:
 
 * Report errors when the option configured is unknown or when something required is missing.
 * Validate the value if the option can be recognized.
@@ -47,9 +47,9 @@ type Config struct {
   Listen string `json:"listen,omitempty"`
 }
 ```
-Struct tags is cool, it should be more powerful than what you had see.
+Struct tags is cool, it should be more powerful than what you had saw.
 
-Configo leverage go struct tags to supply a very simple interface to marshal and unmarshal `TOML` with all these requirements above being satisfied. The tags can be defined as this `cfg:"name, default value or required, validating rules, description"`
+Configo leverages go struct tags to supply a very simple interface to marshal and unmarshal `TOML` with all these requirements above being satisfied. The tags can be defined like this `cfg:"name, default value or required, validating rules, description"`
 
 For example:
 
@@ -59,7 +59,7 @@ type Config struct {
 }
 ```
 
-`listen` is the key mapped in the configuration file. `required` means this should be explicitly configured in the file, or you can specify a valid address for example `:8804` as default value. `netaddr` is the validation rule configo used to validate the value of what you configured. The last part is a description of the key. It is used as a comment when generate a toml based on the go struct.
+`listen` is the key mapped in the configuration file. `required` means the key should be explicitly configured in the file, or you can specify a valid value for example `:8804` as the default value. `netaddr` is the validation rule configo used to validate the value you configured. The last part is a description of the key. It is used as a comment when generate a toml based on the go struct.
 
 ## Introduction to configo
 
@@ -215,4 +215,4 @@ The output should be
 You can see that though we commented out listen and max-connection, they are all set using default value after loaded.
 
 ## Summary
-Configo leverage the go strut tags to supply a simple and powerful api to parse and generate a toml configuration file. Generating toml from your source code makes it simple be consistent between your conf and code. Use default value to minify your configuration or set "required" to ensure the important things have been configured. At last, don't forget validation is really important to avoid mistakes.
+Configo leverages the go strut tags to supply a simple and powerful api to parse and generate a toml configuration file. Generating toml from your source code makes it simple be consistent between your conf and code. Use default value to minify your configuration or set "required" to ensure the important things have been configured. At last, don't forget validation is really important to avoid mistakes.
