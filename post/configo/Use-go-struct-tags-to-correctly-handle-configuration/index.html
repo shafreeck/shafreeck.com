@@ -1,0 +1,355 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+
+  
+  <meta charset="UTF-8">
+  <title>
+    Using go struct tags to handle configuration | Shafreeck Sea
+  </title>
+
+
+  
+  <meta name="viewport" content="width=device-width,user-scalable=no,maximum-scale=1,initial-scale=1">
+
+  
+  <link rel="canonical" href="http://shafreeck.com/post/configo/Use-go-struct-tags-to-correctly-handle-configuration/"/>
+
+  
+  <link rel="stylesheet" href="/css/sanitize.css">
+  <link rel="stylesheet" href="/css/responsive.css">
+  <link rel="stylesheet" href="/css/highlight_monokai.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/custom.css">
+  
+  
+  <link href="http://shafreeck.com/index.xml" rel="alternate" type="application/rss+xml" title="Shafreeck Sea" />
+  <link href="http://shafreeck.com/index.xml" rel="feed" type="application/rss+xml" title="Shafreeck Sea" />
+
+  
+  
+    <script type="text/javascript">var switchTo5x=true;</script>
+    <script type="text/javascript" src="https://ws.sharethis.com/button/buttons.js"></script>
+    <script type="text/javascript">stLight.options({publisher: '6b8032c5-8647-462a-8e27-c63e9b718c8a', doNotHash: true, doNotCopy: true, hashAddressBar: false});</script>
+  
+
+
+</head>
+
+
+
+<body>
+<div class="container">
+
+  
+  <header role="banner">
+    <div class="row gutters">
+      <div id="site-title" class="col span_6">
+        <h1><a href="http://shafreeck.com/">Shafreeck Sea</a></h1>
+        <h2>Share Free and Hack, Then you got shafreeck!</h2>
+      </div>
+      <div id="social" class="col span_6">
+        <ul>
+          <li><a href="https://twitter.com/shafreeck" target="_blank">Twitter</a></li>
+          
+          <li><a href="https://github.com/shafreeck" target="_blank">GitHub</a></li>
+          <li><a href="http://shafreeck.com/index.xml" type="application/rss+xml" target="_blank">RSS</a></li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+
+  
+  <main id="single" role="main">
+    <div class="article-header">
+      <h1>Using go struct tags to handle configuration</h1>
+      <div class="meta">
+        Jun 18, 2016 &nbsp;
+        
+          #<a href="/tags/golang">golang</a>&nbsp;
+        
+          #<a href="/tags/configo">configo</a>&nbsp;
+        
+          #<a href="/tags/toml">toml</a>&nbsp;
+        
+      </div>
+    </div>
+    <article>
+      
+
+<p><a href="https://github.com/shafreeck/configo">configo</a> is a <code>toml</code> parsing library focus on configuration. This article describes what I need to parse a configuration file, why I created configo and how to use it to keep consistent between your code and your configuration file. It is a young project and under active development, feel free to feedback or send me pull requests if there is anything you want to improve.</p>
+
+<h2 id="what-i-need-to-handle-a-configuration-file:755d90bbdcefb91080c33ceaac2529c1">What I need to handle a configuration file</h2>
+
+<p>I have started several projects these days. They all need configuration files to configure its server options.</p>
+
+<p>I looked several configuration file format including <code>json</code>, <code>ini</code>, <code>yaml</code>, and <code>toml</code>. Finally I decide to use <code>toml</code> which aims to be a minimal configuration file format that&rsquo;s easy to read due to obvious semantics. See the <a href="https://github.com/toml-lang/toml#comparison-with-other-formats">docs</a> for details about comparing toml with others.</p>
+
+<p>All my projects are written in go. So I need a go library to load the <code>toml</code> file. There are several awesome projects can do this, but they all miss something I really want.</p>
+
+<h2 id="1-loading-toml-in-a-gopher-way:755d90bbdcefb91080c33ceaac2529c1">1. Loading <code>TOML</code> in a gopher way</h2>
+
+<p>JSON(encoding/json) is a good example to explain what I mean &ldquo;in a gopher way&rdquo; here. Go has a very simple api to parse ajson` data.</p>
+
+<pre><code class="language-go">json.Unmarshal(data []byte, v interface{}) error
+</code></pre>
+
+<p>You define a go struct according to the <code>json</code> and json.Unmarshal it then the struct object&rsquo;s fields will be filled using the values in <code>json</code> data.</p>
+
+<p>What I really want is a <code>toml.Unmarshal</code> method to <code>toml</code>. In fact many projects already support this, but they all miss some semantics of configuration.</p>
+
+<h2 id="2-configuration-semantics:755d90bbdcefb91080c33ceaac2529c1">2. Configuration semantics</h2>
+
+<p>The standard library <code>encoding/json</code> is designed to serialize and deserialize json data. However, configuration is different in many aspects. First, configuration is usually used in almost all services which power your company(maybe facebook, twitter or something else). An error in configuration may cause a disaster. Second, configuration files are usually created and managed by operators or developers, mistakes by humans can be nearly unavoidable. Third, not all configuration options have to be configured, some is required and some can be optional with a default value.</p>
+
+<p>So the core features that should be supplied are as below:</p>
+
+<ul>
+<li>Report errors when the option configured is unknown or when something required is missing.</li>
+<li>Validate the value if the option can be recognized.</li>
+<li>A configuration key can be required or optional, and we can supply a default value when it is optional.</li>
+<li>Write the go struct and generate the configuration file base on it.</li>
+</ul>
+
+<h2 id="3-satisfy-all-things-above-in-a-simple-way:755d90bbdcefb91080c33ceaac2529c1">3. Satisfy all things above in a simple way</h2>
+
+<p>Go support strut tags which can be useful when marshal or unmarshal a go struct. It is a key value format string wrapped around by backticks.</p>
+
+<pre><code class="language-go">type Config struct {
+  Listen string `json:&quot;listen,omitempty&quot;`
+}
+</code></pre>
+
+<p>Struct tags is cool, it should be more powerful than what you had saw.</p>
+
+<p>Configo leverages go struct tags to supply a very simple interface to marshal and unmarshal <code>TOML</code> with all these requirements above being satisfied. The tags can be defined like this <code>cfg:&quot;name, default value or required, validating rules, description&quot;</code></p>
+
+<p>For example:</p>
+
+<pre><code class="language-go">type Config struct {
+  Listen string `cfg:&quot;listen, required, netaddr, The listen address of server&quot;`
+}
+</code></pre>
+
+<p><code>listen</code> is the key mapped in the configuration file. <code>required</code> means the key should be explicitly configured in the file, or you can specify a valid value for example <code>:8804</code> as the default value. <code>netaddr</code> is the validation rule configo used to validate the value you configured. The last part is a description of the key. It is used as a comment when generate a toml based on the go struct.</p>
+
+<h2 id="introduction-to-configo:755d90bbdcefb91080c33ceaac2529c1">Introduction to configo</h2>
+
+<p>Configo use <a href="https://github.com/shafreeck/toml">shafreeck/toml</a> witch is forked from <a href="https://github.com/naoina/toml">naoina/toml</a> to marshal and unmarshal the toml data. It is modified to parse the tags configo used and generate toml with more human friendly information. Do not use it if you just want a toml parser.</p>
+
+<p><a href="https://github.com/asaskevich/govalidator">Govalidator</a> is used in configo to validate configured values. It has
+many kinds of validation rules to satisfy your requirements and it is convenient to add your own rules. <code>netaddr</code> is the rule configo self added to verify a legal listen address.</p>
+
+<p>The tag key of configo is <code>cfg</code>. It obeys the rule of go strut tag format which is key:&ldquo;value string&rdquo;. There should be no spaces between key and value string. The value string configo used can be splited into four parts with commas. All part can be empty but the comma should not be omitted.</p>
+
+<p>Let&rsquo;s try to walk through the flows using the main features of configo.</p>
+
+<h3 id="define-a-struct-with-configo-tag:755d90bbdcefb91080c33ceaac2529c1">Define a struct with configo tag</h3>
+
+<pre><code class="language-go">type Config struct {
+  Listen string `cfg:&quot;listen, :8804, netaddr, The address the server to listen&quot;`
+  MaxConn int `cfg:&quot;max-connection, 10000, numeric, Max number of concurrent connections&quot;`
+  Redis struct{
+    Cluster []string `cfg:&quot;cluster, required, dialstring&quot;, The addresses of redis cluster`
+  }
+}
+</code></pre>
+
+<p>You can see that all the configuration related things are declared using strut tags. Combining the strut and how it should be configured in one place makes it more clear to developers.</p>
+
+<h3 id="generate-a-toml-file:755d90bbdcefb91080c33ceaac2529c1">Generate a toml file</h3>
+
+<pre><code class="language-go">func main() {
+    c := &amp;Config{}
+    if data, err := configo.Marshal(c); err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Printf(&quot;%s&quot;, data)
+    }
+}
+</code></pre>
+
+<p>The complete code can be run is as follows</p>
+
+<pre><code class="language-go">package main
+
+import (
+    &quot;fmt&quot;
+    &quot;github.com/shafreeck/configo&quot;
+)
+
+type Config struct {
+    Listen  string `cfg:&quot;listen, :8804, netaddr, The address the server to listen&quot;`
+    MaxConn int    `cfg:&quot;max-connection, 10000, numeric, Max number of concurrent connections&quot;`
+    Redis   struct {
+        Cluster []string `cfg:&quot;cluster, required, dialstring&quot;, The addresses of redis cluster`
+    }
+}
+
+func main() {
+    c := &amp;Config{}
+    if data, err := configo.Marshal(c); err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Printf(&quot;%s&quot;, data)
+    }
+}
+</code></pre>
+
+<p>Name this source file as <code>conf.go</code> and run</p>
+
+<pre><code class="language-sh">go run conf.go &gt; conf.toml
+</code></pre>
+
+<p>The generated file should be like this:</p>
+
+<pre><code class="language-toml">#type:        string
+#rules:       netaddr
+#description: The address the server to listen
+#default:     :8804
+#listen=&quot;&quot;
+
+#type:        int
+#rules:       numeric
+#description: Max number of concurrent connections
+#default:     10000
+#max-connection=0
+
+[redis]
+#type:        []string
+#rules:       dialstring
+#required
+cluster=[]
+</code></pre>
+
+<p>Yes, configo not just marshal the go object into toml data, it also adds rich useful information about the configuration option, including what the type of the value is and what rules(you can use more than one rule split by spaces) you should obey. Also there is a description describes more details if you supplied. The option will be commented out if there is a default value specified in struct tag. The default value is also put there to remind the developers or operators. The configuration key that is required or missing a default value is uncommented and set with its golang empty value. You should configure it with legal value that match the validation rules.</p>
+
+<h3 id="load-the-toml-file-as-configuration:755d90bbdcefb91080c33ceaac2529c1">Load the toml file as configuration</h3>
+
+<p>Edit <code>conf.toml</code> and configure redis cluster</p>
+
+<pre><code class="language-toml">cluster = [&quot;127.0.0.1:6379&quot;, &quot;127.0.0.1:6380&quot;]
+</code></pre>
+
+<p>Load the toml file using configo.Unmarshal</p>
+
+<pre><code class="language-go">package main
+
+import (
+    &quot;io/ioutil&quot;
+    &quot;log&quot;
+
+    &quot;github.com/shafreeck/configo&quot;
+)
+
+type Config struct {
+    Listen  string `cfg:&quot;listen, :8804, netaddr, The address the server to listen&quot;`
+    MaxConn int    `cfg:&quot;max-connection, 10000, numeric, Max number of concurrent connections&quot;`
+    Redis   struct {
+        Cluster []string `cfg:&quot;cluster, required, dialstring&quot;, The addresses of redis cluster`
+    }
+}
+
+func main() {
+    data, err := ioutil.ReadFile(&quot;conf.toml&quot;)
+    if err != nil {
+        if err != nil {
+            log.Fatalln(err)
+        }
+    }
+
+    c := &amp;Config{}
+
+    if err := configo.Unmarshal(data, c); err != nil {
+        log.Fatalln(err)
+    }
+
+    log.Println(c)
+}
+</code></pre>
+
+<p>Then</p>
+
+<pre><code class="language-sh">go run load.go
+</code></pre>
+
+<p>The output should be</p>
+
+<pre><code>2016/06/18 19:12:35 &amp;{:8804 10000 {[127.0.0.1:6379 127.0.0.1:6380]}}
+</code></pre>
+
+<p>You can see that though we commented out listen and max-connection, they are all set using default value after loaded.</p>
+
+<h2 id="summary:755d90bbdcefb91080c33ceaac2529c1">Summary</h2>
+
+<p>Configo leverages the go strut tags to supply a simple and powerful api to parse and generate a toml configuration file. Generating toml from your source code makes it simple be consistent between your conf and code. Use default value to minify your configuration or set &ldquo;required&rdquo; to ensure the important things have been configured. At last, don&rsquo;t forget validation is really important to avoid mistakes.</p>
+
+      
+      
+      
+        <div id="share-this" class="col span_10">
+          <span class='st_twitter_large' displayText='Tweet'></span>
+          <span class='st_facebook_large' displayText='Facebook'></span>
+          <span class='st_googleplus_large' displayText='Google +'></span>
+          <span class='st_pocket_large' displayText='Pocket'></span>
+          <span class='st_sharethis_large' displayText='ShareThis'></span>
+          <span class='st_email_large' displayText='Email'></span>  
+        </div>
+      
+    </article>
+    
+ <aside><div id="disqus_thread"></div></aside>
+
+<script type="text/javascript">
+     
+    var disqus_shortname = 'shafreeck';
+
+     
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+
+
+
+  </main>
+  
+  <nav class="pagination-single">
+    
+    
+      <span class="next"><a href="http://shafreeck.com/post/fperf/Build-redis-performance-tool-using-fperf/" rel="next">Building redis performance tool with fperf</a> &rarr;</span>
+    
+  </nav>
+
+
+  
+  <footer role="contentinfo">
+    <div style="text-align:center;">
+      
+      Written by Shafreeck Sea
+    </div>
+  </footer>
+
+
+</div>
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script>
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-79546556-1', 'auto');
+	ga('send', 'pageview');
+</script>
+
+</body>
+</html>
+

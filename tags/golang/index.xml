@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Golang on Shafreeck Sea</title>
+    <link>http://shafreeck.com/tags/golang/</link>
+    <description>Recent content in Golang on Shafreeck Sea</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 18 Jun 2016 23:15:30 +0800</lastBuildDate>
+    <atom:link href="http://shafreeck.com/tags/golang/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Building redis performance tool with fperf</title>
+      <link>http://shafreeck.com/post/fperf/Build-redis-performance-tool-using-fperf/</link>
+      <pubDate>Sat, 18 Jun 2016 23:15:30 +0800</pubDate>
+      
+      <guid>http://shafreeck.com/post/fperf/Build-redis-performance-tool-using-fperf/</guid>
+      <description>
+
+&lt;p&gt;&lt;code&gt;fperf&lt;/code&gt; is a powerful and flexible framework allows you to build your own
+benchmark and load testing tool easily. All the knowledge you should
+know is how to send a request and fperf will handle the concurrency and
+statistics.&lt;/p&gt;
+
+&lt;p&gt;This is an example about how to build a redis benchmark tool with fperf in
+3 steps. You can alse build tools for other common servers like mysql, nginx,
+memcached or your own servers. Maybe building benchmark tools for private servers
+is the most cases you need fperf. In fact, fperf is actually created to benchmark
+our grpc servers at first.&lt;/p&gt;
+
+&lt;h2 id=&#34;coding-3-steps-to-build-a-redis-benchmark-tool:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Coding: 3 steps to build a redis benchmark tool&lt;/h2&gt;
+
+&lt;p&gt;You can find the source code from &lt;a href=&#34;https://github.com/shafreeck/fperf/blob/master/testcases/redis/redis.go&#34;&gt;testcases/redis/redis.go&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;create-the-newclientfunc-https-godoc-org-github-com-shafreeck-fperf-client-newclientfunc-function:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Create the &lt;a href=&#34;https://godoc.org/github.com/shafreeck/fperf/client#NewClientFunc&#34;&gt;NewClientFunc&lt;/a&gt; function&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//newRedisClient create the client object. The function should be
+//registered to fperf, fperf -h will list all the registered clients(testcases)
+func newRedisClient(flag *client.FlagSet) client.Client {
+    c := new(redisClient)
+
+    //A client can have itself options. fperf use flag to process
+    //the command args and options
+    flag.BoolVar(&amp;amp;c.options.verbose, &amp;quot;v&amp;quot;, false, &amp;quot;verbose&amp;quot;)
+
+    //Customize the usage output
+    flag.Usage = func() {
+        fmt.Printf(&amp;quot;Usage: redis [options] [cmd] [args...]\noptions:\n&amp;quot;)
+        flag.PrintDefaults()
+    }
+    flag.Parse()
+
+    args := flag.Args()
+    //Set the default command if not be set
+    if len(args) == 0 {
+        args = []string{&amp;quot;SET&amp;quot;, &amp;quot;fperf&amp;quot;, &amp;quot;hello world&amp;quot;}
+    }
+    c.args = args
+
+    if c.options.verbose {
+        fmt.Println(c.args)
+    }
+    return c
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;implement-dial-and-request-methods:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Implement Dial and Request methods&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//Dial to redis server. The addr is set by the fperf option &amp;quot;-server&amp;quot;
+func (c *redisClient) Dial(addr string) error {
+    rds, err := redis.DialURL(addr)
+    if err != nil {
+        return err
+    }
+    c.rds = rds
+    return nil
+}
+
+//Request send a redis request and return the error if there is
+func (c *redisClient) Request() error {
+    var args []interface{}
+
+    //Build the redis cmd and args
+    cmd := c.args[0]
+    for _, arg := range c.args[1:] {
+        args = append(args, arg)
+    }
+    _, err := c.rds.Do(cmd, args...)
+    return err
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;register-to-fperf:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Register to fperf&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//Register to fperf
+//parameters: name to register, NewClientFunc, a description
+func init() {
+	client.Register(&amp;quot;redis&amp;quot;, newRedisClient, &amp;quot;redis performance benchmark&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;build-and-run:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Build and Run&lt;/h2&gt;
+
+&lt;h3 id=&#34;build-your-testcase-using-buildtestcase-sh:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Build your testcase using &amp;ldquo;buildtestcase.sh&amp;rdquo;&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-bash&#34;&gt;./buildtestcase.sh testcases/redis/
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;run-the-benchmark:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Run the benchmark&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-bash&#34;&gt;./fperf -server redis://localhost:6379 redis hset key field value
+2016/04/17 00:04:35 latency 51.447µs qps 18671 total 37343
+2016/04/17 00:04:37 latency 33.881µs qps 27777 total 92898
+Count: 101781  Min: 16491  Max: 42468733  Avg: 43377.29
+------------------------------------------------------------
+[     10000,      11000)       0    0.0%    0.0%
+[     11000,      13800)       0    0.0%    0.0%
+[     13800,      21639)   62151   61.1%   61.1%  ######
+[     21639,      43590)   12092   11.9%   72.9%  #
+[     43590,     105055)   15539   15.3%   88.2%  ##
+[    105055,     277158)   11941   11.7%   99.9%  #
+[    277158,     759048)      43    0.0%  100.0%
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;See the &lt;a href=&#34;https://github.com/shafreeck/fperf/blob/master/docs/quickstart.md&#34;&gt;quick start&lt;/a&gt; to learn about the output of fperf.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Using go struct tags to handle configuration</title>
+      <link>http://shafreeck.com/post/configo/Use-go-struct-tags-to-correctly-handle-configuration/</link>
+      <pubDate>Sat, 18 Jun 2016 17:35:36 +0800</pubDate>
+      
+      <guid>http://shafreeck.com/post/configo/Use-go-struct-tags-to-correctly-handle-configuration/</guid>
+      <description>
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/shafreeck/configo&#34;&gt;configo&lt;/a&gt; is a &lt;code&gt;toml&lt;/code&gt; parsing library focus on configuration. This article describes what I need to parse a configuration file, why I created configo and how to use it to keep consistent between your code and your configuration file. It is a young project and under active development, feel free to feedback or send me pull requests if there is anything you want to improve.&lt;/p&gt;
+
+&lt;h2 id=&#34;what-i-need-to-handle-a-configuration-file:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;What I need to handle a configuration file&lt;/h2&gt;
+
+&lt;p&gt;I have started several projects these days. They all need configuration files to configure its server options.&lt;/p&gt;
+
+&lt;p&gt;I looked several configuration file format including &lt;code&gt;json&lt;/code&gt;, &lt;code&gt;ini&lt;/code&gt;, &lt;code&gt;yaml&lt;/code&gt;, and &lt;code&gt;toml&lt;/code&gt;. Finally I decide to use &lt;code&gt;toml&lt;/code&gt; which aims to be a minimal configuration file format that&amp;rsquo;s easy to read due to obvious semantics. See the &lt;a href=&#34;https://github.com/toml-lang/toml#comparison-with-other-formats&#34;&gt;docs&lt;/a&gt; for details about comparing toml with others.&lt;/p&gt;
+
+&lt;p&gt;All my projects are written in go. So I need a go library to load the &lt;code&gt;toml&lt;/code&gt; file. There are several awesome projects can do this, but they all miss something I really want.&lt;/p&gt;
+
+&lt;h2 id=&#34;1-loading-toml-in-a-gopher-way:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;1. Loading &lt;code&gt;TOML&lt;/code&gt; in a gopher way&lt;/h2&gt;
+
+&lt;p&gt;JSON(encoding/json) is a good example to explain what I mean &amp;ldquo;in a gopher way&amp;rdquo; here. Go has a very simple api to parse ajson` data.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;json.Unmarshal(data []byte, v interface{}) error
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You define a go struct according to the &lt;code&gt;json&lt;/code&gt; and json.Unmarshal it then the struct object&amp;rsquo;s fields will be filled using the values in &lt;code&gt;json&lt;/code&gt; data.&lt;/p&gt;
+
+&lt;p&gt;What I really want is a &lt;code&gt;toml.Unmarshal&lt;/code&gt; method to &lt;code&gt;toml&lt;/code&gt;. In fact many projects already support this, but they all miss some semantics of configuration.&lt;/p&gt;
+
+&lt;h2 id=&#34;2-configuration-semantics:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;2. Configuration semantics&lt;/h2&gt;
+
+&lt;p&gt;The standard library &lt;code&gt;encoding/json&lt;/code&gt; is designed to serialize and deserialize json data. However, configuration is different in many aspects. First, configuration is usually used in almost all services which power your company(maybe facebook, twitter or something else). An error in configuration may cause a disaster. Second, configuration files are usually created and managed by operators or developers, mistakes by humans can be nearly unavoidable. Third, not all configuration options have to be configured, some is required and some can be optional with a default value.&lt;/p&gt;
+
+&lt;p&gt;So the core features that should be supplied are as below:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Report errors when the option configured is unknown or when something required is missing.&lt;/li&gt;
+&lt;li&gt;Validate the value if the option can be recognized.&lt;/li&gt;
+&lt;li&gt;A configuration key can be required or optional, and we can supply a default value when it is optional.&lt;/li&gt;
+&lt;li&gt;Write the go struct and generate the configuration file base on it.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;3-satisfy-all-things-above-in-a-simple-way:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;3. Satisfy all things above in a simple way&lt;/h2&gt;
+
+&lt;p&gt;Go support strut tags which can be useful when marshal or unmarshal a go struct. It is a key value format string wrapped around by backticks.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;type Config struct {
+  Listen string `json:&amp;quot;listen,omitempty&amp;quot;`
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Struct tags is cool, it should be more powerful than what you had saw.&lt;/p&gt;
+
+&lt;p&gt;Configo leverages go struct tags to supply a very simple interface to marshal and unmarshal &lt;code&gt;TOML&lt;/code&gt; with all these requirements above being satisfied. The tags can be defined like this &lt;code&gt;cfg:&amp;quot;name, default value or required, validating rules, description&amp;quot;&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;For example:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;type Config struct {
+  Listen string `cfg:&amp;quot;listen, required, netaddr, The listen address of server&amp;quot;`
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;listen&lt;/code&gt; is the key mapped in the configuration file. &lt;code&gt;required&lt;/code&gt; means the key should be explicitly configured in the file, or you can specify a valid value for example &lt;code&gt;:8804&lt;/code&gt; as the default value. &lt;code&gt;netaddr&lt;/code&gt; is the validation rule configo used to validate the value you configured. The last part is a description of the key. It is used as a comment when generate a toml based on the go struct.&lt;/p&gt;
+
+&lt;h2 id=&#34;introduction-to-configo:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;Introduction to configo&lt;/h2&gt;
+
+&lt;p&gt;Configo use &lt;a href=&#34;https://github.com/shafreeck/toml&#34;&gt;shafreeck/toml&lt;/a&gt; witch is forked from &lt;a href=&#34;https://github.com/naoina/toml&#34;&gt;naoina/toml&lt;/a&gt; to marshal and unmarshal the toml data. It is modified to parse the tags configo used and generate toml with more human friendly information. Do not use it if you just want a toml parser.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/asaskevich/govalidator&#34;&gt;Govalidator&lt;/a&gt; is used in configo to validate configured values. It has
+many kinds of validation rules to satisfy your requirements and it is convenient to add your own rules. &lt;code&gt;netaddr&lt;/code&gt; is the rule configo self added to verify a legal listen address.&lt;/p&gt;
+
+&lt;p&gt;The tag key of configo is &lt;code&gt;cfg&lt;/code&gt;. It obeys the rule of go strut tag format which is key:&amp;ldquo;value string&amp;rdquo;. There should be no spaces between key and value string. The value string configo used can be splited into four parts with commas. All part can be empty but the comma should not be omitted.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s try to walk through the flows using the main features of configo.&lt;/p&gt;
+
+&lt;h3 id=&#34;define-a-struct-with-configo-tag:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;Define a struct with configo tag&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;type Config struct {
+  Listen string `cfg:&amp;quot;listen, :8804, netaddr, The address the server to listen&amp;quot;`
+  MaxConn int `cfg:&amp;quot;max-connection, 10000, numeric, Max number of concurrent connections&amp;quot;`
+  Redis struct{
+    Cluster []string `cfg:&amp;quot;cluster, required, dialstring&amp;quot;, The addresses of redis cluster`
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can see that all the configuration related things are declared using strut tags. Combining the strut and how it should be configured in one place makes it more clear to developers.&lt;/p&gt;
+
+&lt;h3 id=&#34;generate-a-toml-file:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;Generate a toml file&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func main() {
+    c := &amp;amp;Config{}
+    if data, err := configo.Marshal(c); err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Printf(&amp;quot;%s&amp;quot;, data)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The complete code can be run is as follows&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;package main
+
+import (
+    &amp;quot;fmt&amp;quot;
+    &amp;quot;github.com/shafreeck/configo&amp;quot;
+)
+
+type Config struct {
+    Listen  string `cfg:&amp;quot;listen, :8804, netaddr, The address the server to listen&amp;quot;`
+    MaxConn int    `cfg:&amp;quot;max-connection, 10000, numeric, Max number of concurrent connections&amp;quot;`
+    Redis   struct {
+        Cluster []string `cfg:&amp;quot;cluster, required, dialstring&amp;quot;, The addresses of redis cluster`
+    }
+}
+
+func main() {
+    c := &amp;amp;Config{}
+    if data, err := configo.Marshal(c); err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Printf(&amp;quot;%s&amp;quot;, data)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Name this source file as &lt;code&gt;conf.go&lt;/code&gt; and run&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sh&#34;&gt;go run conf.go &amp;gt; conf.toml
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The generated file should be like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-toml&#34;&gt;#type:        string
+#rules:       netaddr
+#description: The address the server to listen
+#default:     :8804
+#listen=&amp;quot;&amp;quot;
+
+#type:        int
+#rules:       numeric
+#description: Max number of concurrent connections
+#default:     10000
+#max-connection=0
+
+[redis]
+#type:        []string
+#rules:       dialstring
+#required
+cluster=[]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Yes, configo not just marshal the go object into toml data, it also adds rich useful information about the configuration option, including what the type of the value is and what rules(you can use more than one rule split by spaces) you should obey. Also there is a description describes more details if you supplied. The option will be commented out if there is a default value specified in struct tag. The default value is also put there to remind the developers or operators. The configuration key that is required or missing a default value is uncommented and set with its golang empty value. You should configure it with legal value that match the validation rules.&lt;/p&gt;
+
+&lt;h3 id=&#34;load-the-toml-file-as-configuration:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;Load the toml file as configuration&lt;/h3&gt;
+
+&lt;p&gt;Edit &lt;code&gt;conf.toml&lt;/code&gt; and configure redis cluster&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-toml&#34;&gt;cluster = [&amp;quot;127.0.0.1:6379&amp;quot;, &amp;quot;127.0.0.1:6380&amp;quot;]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Load the toml file using configo.Unmarshal&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;package main
+
+import (
+    &amp;quot;io/ioutil&amp;quot;
+    &amp;quot;log&amp;quot;
+
+    &amp;quot;github.com/shafreeck/configo&amp;quot;
+)
+
+type Config struct {
+    Listen  string `cfg:&amp;quot;listen, :8804, netaddr, The address the server to listen&amp;quot;`
+    MaxConn int    `cfg:&amp;quot;max-connection, 10000, numeric, Max number of concurrent connections&amp;quot;`
+    Redis   struct {
+        Cluster []string `cfg:&amp;quot;cluster, required, dialstring&amp;quot;, The addresses of redis cluster`
+    }
+}
+
+func main() {
+    data, err := ioutil.ReadFile(&amp;quot;conf.toml&amp;quot;)
+    if err != nil {
+        if err != nil {
+            log.Fatalln(err)
+        }
+    }
+
+    c := &amp;amp;Config{}
+
+    if err := configo.Unmarshal(data, c); err != nil {
+        log.Fatalln(err)
+    }
+
+    log.Println(c)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Then&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-sh&#34;&gt;go run load.go
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The output should be&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;2016/06/18 19:12:35 &amp;amp;{:8804 10000 {[127.0.0.1:6379 127.0.0.1:6380]}}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can see that though we commented out listen and max-connection, they are all set using default value after loaded.&lt;/p&gt;
+
+&lt;h2 id=&#34;summary:755d90bbdcefb91080c33ceaac2529c1&#34;&gt;Summary&lt;/h2&gt;
+
+&lt;p&gt;Configo leverages the go strut tags to supply a simple and powerful api to parse and generate a toml configuration file. Generating toml from your source code makes it simple be consistent between your conf and code. Use default value to minify your configuration or set &amp;ldquo;required&amp;rdquo; to ensure the important things have been configured. At last, don&amp;rsquo;t forget validation is really important to avoid mistakes.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

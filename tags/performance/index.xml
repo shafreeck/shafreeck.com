@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Performance on Shafreeck Sea</title>
+    <link>http://shafreeck.com/tags/performance/</link>
+    <description>Recent content in Performance on Shafreeck Sea</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 18 Jun 2016 23:15:30 +0800</lastBuildDate>
+    <atom:link href="http://shafreeck.com/tags/performance/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Building redis performance tool with fperf</title>
+      <link>http://shafreeck.com/post/fperf/Build-redis-performance-tool-using-fperf/</link>
+      <pubDate>Sat, 18 Jun 2016 23:15:30 +0800</pubDate>
+      
+      <guid>http://shafreeck.com/post/fperf/Build-redis-performance-tool-using-fperf/</guid>
+      <description>
+
+&lt;p&gt;&lt;code&gt;fperf&lt;/code&gt; is a powerful and flexible framework allows you to build your own
+benchmark and load testing tool easily. All the knowledge you should
+know is how to send a request and fperf will handle the concurrency and
+statistics.&lt;/p&gt;
+
+&lt;p&gt;This is an example about how to build a redis benchmark tool with fperf in
+3 steps. You can alse build tools for other common servers like mysql, nginx,
+memcached or your own servers. Maybe building benchmark tools for private servers
+is the most cases you need fperf. In fact, fperf is actually created to benchmark
+our grpc servers at first.&lt;/p&gt;
+
+&lt;h2 id=&#34;coding-3-steps-to-build-a-redis-benchmark-tool:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Coding: 3 steps to build a redis benchmark tool&lt;/h2&gt;
+
+&lt;p&gt;You can find the source code from &lt;a href=&#34;https://github.com/shafreeck/fperf/blob/master/testcases/redis/redis.go&#34;&gt;testcases/redis/redis.go&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;create-the-newclientfunc-https-godoc-org-github-com-shafreeck-fperf-client-newclientfunc-function:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Create the &lt;a href=&#34;https://godoc.org/github.com/shafreeck/fperf/client#NewClientFunc&#34;&gt;NewClientFunc&lt;/a&gt; function&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//newRedisClient create the client object. The function should be
+//registered to fperf, fperf -h will list all the registered clients(testcases)
+func newRedisClient(flag *client.FlagSet) client.Client {
+    c := new(redisClient)
+
+    //A client can have itself options. fperf use flag to process
+    //the command args and options
+    flag.BoolVar(&amp;amp;c.options.verbose, &amp;quot;v&amp;quot;, false, &amp;quot;verbose&amp;quot;)
+
+    //Customize the usage output
+    flag.Usage = func() {
+        fmt.Printf(&amp;quot;Usage: redis [options] [cmd] [args...]\noptions:\n&amp;quot;)
+        flag.PrintDefaults()
+    }
+    flag.Parse()
+
+    args := flag.Args()
+    //Set the default command if not be set
+    if len(args) == 0 {
+        args = []string{&amp;quot;SET&amp;quot;, &amp;quot;fperf&amp;quot;, &amp;quot;hello world&amp;quot;}
+    }
+    c.args = args
+
+    if c.options.verbose {
+        fmt.Println(c.args)
+    }
+    return c
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;implement-dial-and-request-methods:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Implement Dial and Request methods&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//Dial to redis server. The addr is set by the fperf option &amp;quot;-server&amp;quot;
+func (c *redisClient) Dial(addr string) error {
+    rds, err := redis.DialURL(addr)
+    if err != nil {
+        return err
+    }
+    c.rds = rds
+    return nil
+}
+
+//Request send a redis request and return the error if there is
+func (c *redisClient) Request() error {
+    var args []interface{}
+
+    //Build the redis cmd and args
+    cmd := c.args[0]
+    for _, arg := range c.args[1:] {
+        args = append(args, arg)
+    }
+    _, err := c.rds.Do(cmd, args...)
+    return err
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;register-to-fperf:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Register to fperf&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;//Register to fperf
+//parameters: name to register, NewClientFunc, a description
+func init() {
+	client.Register(&amp;quot;redis&amp;quot;, newRedisClient, &amp;quot;redis performance benchmark&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;build-and-run:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Build and Run&lt;/h2&gt;
+
+&lt;h3 id=&#34;build-your-testcase-using-buildtestcase-sh:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Build your testcase using &amp;ldquo;buildtestcase.sh&amp;rdquo;&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-bash&#34;&gt;./buildtestcase.sh testcases/redis/
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;run-the-benchmark:a6cb93323da28c0b4193a54232ad5dee&#34;&gt;Run the benchmark&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-bash&#34;&gt;./fperf -server redis://localhost:6379 redis hset key field value
+2016/04/17 00:04:35 latency 51.447µs qps 18671 total 37343
+2016/04/17 00:04:37 latency 33.881µs qps 27777 total 92898
+Count: 101781  Min: 16491  Max: 42468733  Avg: 43377.29
+------------------------------------------------------------
+[     10000,      11000)       0    0.0%    0.0%
+[     11000,      13800)       0    0.0%    0.0%
+[     13800,      21639)   62151   61.1%   61.1%  ######
+[     21639,      43590)   12092   11.9%   72.9%  #
+[     43590,     105055)   15539   15.3%   88.2%  ##
+[    105055,     277158)   11941   11.7%   99.9%  #
+[    277158,     759048)      43    0.0%  100.0%
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;See the &lt;a href=&#34;https://github.com/shafreeck/fperf/blob/master/docs/quickstart.md&#34;&gt;quick start&lt;/a&gt; to learn about the output of fperf.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
