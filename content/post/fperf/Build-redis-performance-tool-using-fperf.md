@@ -1,11 +1,9 @@
 +++
 author = "Shafreeck Sea"
 date = "2016-06-18T23:15:30+08:00"
-title = "Build redis performance tool using fperf"
+title = "Building redis performance tool with fperf"
 tags = ["golang", "performance", "fperf"]
 +++
-
-# Build redis performance tool using fperf
 
 `fperf` is a powerful and flexible framework allows you to build your own
 benchmark and load testing tool easily. All the knowledge you should

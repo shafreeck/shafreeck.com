@@ -1,7 +1,7 @@
 +++
 author = "Shafreeck Sea"
 date = "2016-06-18T17:35:36+08:00"
-title = "Go struct tags is a simple and powerful way to handle configuration"
+title = "Using go struct tags to handle configuration"
 tags = ["golang", "configo", "toml"]
 +++
 
